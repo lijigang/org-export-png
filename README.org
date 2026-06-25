@@ -24,7 +24,7 @@
 | Emacs 27.1+ | 必需 | |
 | Chromium 内核浏览器 | 必需 | Chrome / Brave / Chromium / Edge，用于渲染截图 |
 | ImageMagick | 推荐 | =magick= / =convert=，用于裁掉多余留白（缺失则图片会带较多空白） |
-| 一款中文字体 | 推荐 | 默认 [[https://github.com/oneforalone/KingHwa_OldSong-Chinese-character][京華老宋体]]（免费）；没有也能跑，会回退到系统衬线 |
+| 一款中文字体 | 推荐 | 默认 *京華老宋体（KingHwa_OldSong）*，一款免费老宋体（网络搜索即可下载）；没有也能跑，会回退到系统衬线 |
 
 提示：中英自动间距需要较新的浏览器（Chrome 131+）。旧版本仍可导出，只是少了 =text-autospace= 的自动留白。
 
@@ -126,7 +126,7 @@ HTML 片段  ──套上版心 + 排版 CSS──▶  完整 HTML
 
 * 字体
 
-默认 [[https://github.com/oneforalone/KingHwa_OldSong-Chinese-character][京華老宋体（KingHwa_OldSong）]]，一款气质很好的免费老宋体。装好后会被自动探测到。
+默认 *京華老宋体（KingHwa_OldSong）*，一款气质很好的免费老宋体（网络搜索 “京華老宋体” 即可下载）。装好后会被自动探测到。
 
 想换字体：把字体装好，然后
 
