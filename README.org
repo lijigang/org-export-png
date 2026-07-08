@@ -10,6 +10,7 @@
 * 特性
 
 - *选区即卡片*：选中任意文字（或整个 subtree / buffer），一键导出 PNG。
+- *标题入卡片*：导出整个文件时，=#+title:= / =#+subtitle:= 会变成有设计感的卡片标题区。
 - *优良排版*：版心、行高、两端对齐、引用块、列表、表格、代码块、链接都有讲究的样式。
 - *中文排版规范*：中英 / 中数之间的间距由 CSS =text-autospace= 自动生成，*不改动你的原文*。
 - *指定字体*：通过 =@font-face= 直接嵌入字体文件，渲染结果与系统是否注册无关，稳定可控。
@@ -74,7 +75,7 @@ git clone https://github.com/lijigang/org-export-png ~/.emacs.d/site-lisp/org-ex
 - =C-c C-e g g= —— 通过 =org-export-dispatch= 菜单（看到 “[g] Export to PNG image”）；
 - =M-x org-export-png-region= —— 直接命令。
 
-没有选区时，导出当前 subtree 或整个 buffer。PNG 默认写到 =~/Downloads/= 并自动打开。
+没有选区时，导出当前 subtree 或整个 buffer。整个 buffer 里若有 =#+title:= / =#+subtitle:=，会自动渲染为卡片顶部标题区。PNG 默认写到 =~/Downloads/= 并自动打开。
 
 * 自定义
 
@@ -94,6 +95,7 @@ git clone https://github.com/lijigang/org-export-png ~/.emacs.d/site-lisp/org-ex
 | =org-export-png-output-dir= | ="~/Downloads"= | 输出目录 |
 | =org-export-png-open-after= | =t= | 导出后是否自动打开 |
 | =org-export-png-pangu= | =t= | 给紧贴中文的 =code= / =/斜体/= 标记补空格，使其正确解析 |
+| =org-export-png-with-title= | =t= | 是否把 =#+title:= / =#+subtitle:= 渲染成卡片标题区 |
 | =org-export-png-max-height= | =6000= | 渲染视口高度；超长区域被截断时调大 |
 | =org-export-png-trim= | =t= | 是否用 ImageMagick 裁掉多余留白 |
 | =org-export-png-browser= | 自动 | 浏览器可执行文件路径 |
@@ -121,6 +123,7 @@ HTML 片段  ──套上版心 + 排版 CSS──▶  完整 HTML
 几个排版细节：
 
 - *中英留白* 用 CSS =text-autospace=（不往原文里塞空格）；
+- =#+title:= / =#+subtitle:= 会在 HTML 片段外额外生成标题区，因为 Org 的 body-only 导出不会把文档标题放进正文；
 - =org-export-png-pangu= 会在导出前给紧贴全角标点的 =code= / =/斜体/= 等标记补一个空格，否则 Org 不会把它们解析成行内样式（只影响渲染副本，*不动你的 buffer*）；
 - 字体经 =@font-face= 以 =url(file://…)= 嵌入，并以 =--allow-file-access-from-files= 让 headless Chrome 读到本地字体文件，做到字体确定可控。
 

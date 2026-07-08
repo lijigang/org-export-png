@@ -199,6 +199,11 @@ encodes CJK/space/special bytes so headless Chrome accepts it)."
       ".card h1,.card h2,.card h3,.card h4{line-height:1.45;margin:1.5em 0 .7em;font-weight:700;}"
       ".card h1{font-size:1.6em;} .card h2{font-size:1.34em;} .card h3{font-size:1.14em;}"
       ".card h4{font-size:1em;}"
+      ".card-title{position:relative;margin:0 0 1.35em;padding:0 0 1.05em;border-bottom:1px solid #d8c4ad;}"
+      ".card-title:before{content:'';display:block;width:2.4em;height:3px;margin:0 0 .72em;background:#9c5a2f;border-radius:999px;}"
+      ".card-title h1{margin:0;color:#17130f;font-size:1.72em;line-height:1.28;font-weight:800;letter-spacing:0;text-align:left;}"
+      ".card p.card-subtitle{margin:.62em 0 0;color:#6a6258;font-size:.76em;line-height:1.55;text-align:left;}"
+      ".card .card-title+*{margin-top:0;}"
       ".card ul,.card ol{margin:0 0 1.05em;padding-left:1.5em;}"
       ".card li{margin:.3em 0;}"
       ".card code{font-family:'" mf "',ui-monospace,SFMono-Regular,monospace;"
@@ -275,6 +280,10 @@ leaks into the image.  Your buffer is never modified — only the rendered copy.
 Src/example blocks are left untouched."
   :type 'boolean)
 
+(defcustom org-export-png-with-title t
+  "When non-nil, render #+title and #+subtitle as a designed card header."
+  :type 'boolean)
+
 (defconst org-export-png--cjk
   "[　-〿㐀-䶿一-鿿豈-﫿＀-￯]"
   "Regexp class: CJK ideographs and CJK / full-width punctuation.")
@@ -304,6 +313,35 @@ Lines inside src/example/export blocks pass through unchanged."
         (push line out))))
     (mapconcat #'identity (nreverse out) "\n")))
 
+(defun org-export-png--keywords (org-text)
+  "Collect title-related Org keywords from ORG-TEXT."
+  (with-temp-buffer
+    (insert org-text)
+    (delay-mode-hooks (org-mode))
+    (org-collect-keywords '("TITLE" "SUBTITLE") '("TITLE" "SUBTITLE"))))
+
+(defun org-export-png--keyword-value (keywords key)
+  "Return trimmed KEY value from KEYWORDS."
+  (let ((value (cdr (assoc key keywords))))
+    (when (and (stringp value) (not (string-empty-p (string-trim value))))
+      (string-trim value))))
+
+(defun org-export-png--title-html (org-text)
+  "Return a designed title block for ORG-TEXT, or nil."
+  (when org-export-png-with-title
+    (let* ((keywords (org-export-png--keywords org-text))
+           (title (org-export-png--keyword-value keywords "TITLE"))
+           (subtitle (org-export-png--keyword-value keywords "SUBTITLE")))
+      (when title
+        (concat
+         "<header class=\"card-title\">"
+         "<h1>" (org-html-encode-plain-text title) "</h1>"
+         (when subtitle
+           (concat "<p class=\"card-subtitle\">"
+                   (org-html-encode-plain-text subtitle)
+                   "</p>"))
+         "</header>")))))
+
 ;;;; Public API ---------------------------------------------------------------
 
 (defun org-export-png--finish (png)
@@ -318,13 +356,17 @@ Lines inside src/example/export blocks pass through unchanged."
 (defun org-export-png-string (org-text &optional png)
   "Export ORG-TEXT (Org markup) to a PNG file; return its path.
 Applies CJK emphasis padding when `org-export-png-pangu' is non-nil.
+Renders #+title and #+subtitle when `org-export-png-with-title' is non-nil.
 Batch-testable."
   (let* ((txt (if org-export-png-pangu
                   (org-export-png--pad-emphasis org-text) org-text))
          (body (org-export-string-as
                 txt 'html t
-                '(:with-toc nil :with-sub-superscript nil :with-smart-quotes t))))
-    (org-export-png--from-html-body body png)))
+                '(:with-toc nil :with-sub-superscript nil :with-smart-quotes t)))
+         (title-html (org-export-png--title-html org-text)))
+    (org-export-png--from-html-body
+     (if title-html (concat title-html body) body)
+     png)))
 
 (defun org-export-png--scope-text (&optional subtreep)
   "Return Org text for the active region, the subtree (if SUBTREEP), or buffer."
