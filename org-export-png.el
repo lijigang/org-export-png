@@ -29,7 +29,7 @@
 ;; image with high-quality typography — handy for sharing a snippet as a card
 ;; on chat / 微信 / 小红书.  Pipeline:
 ;;
-;;   Org region --(ox-html)--> HTML body --(template + CSS)--> headless Chrome
+;;   Org region --(ox-html)--> HTML document --(card template)--> headless Chrome
 ;;   --(--screenshot)--> PNG  --(ImageMagick -trim, optional)--> tight card.
 ;;
 ;; Typography follows the Chinese Copywriting Guidelines
@@ -223,11 +223,47 @@ encodes CJK/space/special bytes so headless Chrome accepts it)."
       ".card img{max-width:100%;}")
      "")))   ; join with "" — a newline here would land *inside* split values (e.g. width:\n460\npx) and void them
 
-(defun org-export-png--wrap (body)
-  "Wrap HTML BODY in a full document with the card CSS."
-  (concat "<!DOCTYPE html>\n<html lang=\"zh-Hans\"><head><meta charset=\"utf-8\">\n"
-          "<style>\n" (org-export-png--css) "\n</style></head>\n"
-          "<body><div class=\"card\">\n" body "\n</div></body></html>\n"))
+(defun org-export-png--title-html (info)
+  "Return a designed title block from export INFO, or nil."
+  (when org-export-png-with-title
+    (let* ((title-data (plist-get info :title))
+           (subtitle-data (plist-get info :subtitle))
+           (title (and title-data (string-trim (org-export-data title-data info))))
+           (subtitle (and subtitle-data
+                          (string-trim (org-export-data subtitle-data info)))))
+      (when (org-string-nw-p title)
+        (concat
+         "<header class=\"card-title\">"
+         "<h1>" title "</h1>"
+         (when (org-string-nw-p subtitle)
+           (concat "<p class=\"card-subtitle\">" subtitle "</p>"))
+         "</header>")))))
+
+(defun org-export-png--html-template (contents info)
+  "Return a complete card HTML document for CONTENTS using export INFO.
+Delegate document assembly to `org-html-template' so Org can include MathJax
+or any other resources required by the parsed document."
+  (let ((title-html (org-export-png--title-html info))
+        (info (copy-sequence info)))
+    ;; Keep the deterministic card surface while letting `org-html-template'
+    ;; add conditional resources such as MathJax from the original parse tree.
+    (dolist (setting `((:html-head . ,(concat "<style>\n"
+                                             (org-export-png--css)
+                                             "\n</style>"))
+                       (:html-head-extra . "")
+                       (:html-head-include-default-style . nil)
+                       (:html-head-include-scripts . nil)
+                       (:html-content-class . "card")
+                       (:html-preamble . nil)
+                       (:html-postamble . nil)
+                       (:language . "zh-Hans")
+                       (:with-title . nil)
+                       (:with-author . nil)
+                       (:with-email . nil)
+                       (:with-date . nil)
+                       (:with-creator . nil)))
+      (setq info (plist-put info (car setting) (cdr setting))))
+    (org-html-template (concat (or title-html "") contents) info)))
 
 ;;;; Rendering ----------------------------------------------------------------
 
@@ -262,13 +298,13 @@ encodes CJK/space/special bytes so headless Chrome accepts it)."
                       (expand-file-name png))))
     (expand-file-name png)))
 
-(defun org-export-png--from-html-body (body &optional png)
-  "Build the card from HTML BODY and render to PNG (default: timestamped)."
+(defun org-export-png--from-html (html &optional png)
+  "Render complete card HTML to PNG (default: timestamped)."
   (let ((png (expand-file-name
               (or png (format-time-string "org-export-%Y%m%dT%H%M%S.png")
                   )
               (and (not png) (expand-file-name org-export-png-output-dir)))))
-    (org-export-png--render (org-export-png--wrap body) png)))
+    (org-export-png--render html png)))
 
 ;;;; Pangu: pad emphasis markers sitting against CJK --------------------------
 
@@ -313,35 +349,6 @@ Lines inside src/example/export blocks pass through unchanged."
         (push line out))))
     (mapconcat #'identity (nreverse out) "\n")))
 
-(defun org-export-png--keywords (org-text)
-  "Collect title-related Org keywords from ORG-TEXT."
-  (with-temp-buffer
-    (insert org-text)
-    (delay-mode-hooks (org-mode))
-    (org-collect-keywords '("TITLE" "SUBTITLE") '("TITLE" "SUBTITLE"))))
-
-(defun org-export-png--keyword-value (keywords key)
-  "Return trimmed KEY value from KEYWORDS."
-  (let ((value (cdr (assoc key keywords))))
-    (when (and (stringp value) (not (string-empty-p (string-trim value))))
-      (string-trim value))))
-
-(defun org-export-png--title-html (org-text)
-  "Return a designed title block for ORG-TEXT, or nil."
-  (when org-export-png-with-title
-    (let* ((keywords (org-export-png--keywords org-text))
-           (title (org-export-png--keyword-value keywords "TITLE"))
-           (subtitle (org-export-png--keyword-value keywords "SUBTITLE")))
-      (when title
-        (concat
-         "<header class=\"card-title\">"
-         "<h1>" (org-html-encode-plain-text title) "</h1>"
-         (when subtitle
-           (concat "<p class=\"card-subtitle\">"
-                   (org-html-encode-plain-text subtitle)
-                   "</p>"))
-         "</header>")))))
-
 ;;;; Public API ---------------------------------------------------------------
 
 (defun org-export-png--finish (png)
@@ -360,13 +367,10 @@ Renders #+title and #+subtitle when `org-export-png-with-title' is non-nil.
 Batch-testable."
   (let* ((txt (if org-export-png-pangu
                   (org-export-png--pad-emphasis org-text) org-text))
-         (body (org-export-string-as
-                txt 'html t
-                '(:with-toc nil :with-sub-superscript nil :with-smart-quotes t)))
-         (title-html (org-export-png--title-html org-text)))
-    (org-export-png--from-html-body
-     (if title-html (concat title-html body) body)
-     png)))
+         (html (org-export-string-as
+                txt 'png nil
+                '(:with-toc nil :with-sub-superscript nil :with-smart-quotes t))))
+    (org-export-png--from-html html png)))
 
 (defun org-export-png--scope-text (&optional subtreep)
   "Return Org text for the active region, the subtree (if SUBTREEP), or buffer."
@@ -395,6 +399,7 @@ Honours an active region and subtree scope; runs the same pipeline."
 ;; NOTE: key must NOT be ?P — org-export-dispatch hard-codes ?P for Publish
 ;; (ox.el: first-key ?P only maps f/p/x/a; anything else dispatches to nil).
 (org-export-define-derived-backend 'png 'html
+  :translate-alist '((template . org-export-png--html-template))
   :menu-entry
   '(?g "Export to PNG image"
        ((?g "As PNG (region/subtree/buffer)" org-export-png--dispatch))))
